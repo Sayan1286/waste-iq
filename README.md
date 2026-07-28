@@ -467,7 +467,7 @@ Screenshots are located in [`docs/screenshots/`](docs/screenshots/).
 
 | Screen | Preview |
 |--------|---------|
-| Citizen Dashboard | `docs/screenshots/citizen-dashboard.png` |
+| Citizen Dashboard | `docs/screenshots/citizen-dashboard2.png` |
 | Pickup Request Form | `docs/screenshots/new-pickup.png` |
 | Collector Map View | `docs/screenshots/collector-nearby.png` |
 | Admin Analytics | `docs/screenshots/admin-analytics.png` |
