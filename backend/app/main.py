@@ -36,6 +36,8 @@ async def lifespan(_: FastAPI):
         stop_scheduler()
 
 
+# Read CORS origins once at startup so the middleware and the /health
+# endpoint always report the same allowlist for the lifetime of the process.
 cors_origins = settings.cors_origins_list
 
 app = FastAPI(
@@ -83,12 +85,13 @@ async def image_upload_unavailable_error_handler(
 
 
 @app.get("/health", tags=["health"])
-def healthcheck():
+def healthcheck() -> dict[str, object]:
     return {
         "status": "ok",
         "app": settings.app_name,
         "cors_origins": settings.cors_origins_list,
     }
+
 
 
 @app.get("/debug/cors", tags=["health"])
@@ -98,3 +101,5 @@ def debug_cors():
         "cors_origins_list": settings.cors_origins_list,
         "loaded_into_middleware": cors_origins,
     }
+
+

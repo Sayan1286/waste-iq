@@ -7,10 +7,17 @@ import { NotificationCard } from "@/components/dashboard/NotificationCard";
 import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
 import { REMEMBER_ME_KEY } from "@/lib/constants";
+import { getPortalConfig } from "@/lib/portal";
 
-export function SettingsPage() {
-  const { logout } = useAuth();
+export function RoleSettingsPage() {
+  const { user, logout } = useAuth();
   const { theme, setTheme } = useTheme();
+
+  if (!user) {
+    return null;
+  }
+
+  const portal = getPortalConfig(user.role);
   const rememberPreference =
     typeof window !== "undefined" && localStorage.getItem(REMEMBER_ME_KEY) === "true"
       ? "Remembered on this device"
@@ -19,14 +26,14 @@ export function SettingsPage() {
   return (
     <>
       <SeoHead
-        title="Settings"
-        description="Adjust citizen portal theme preferences and review session behavior in Waste-IQ."
-        path="/dashboard/settings"
+        title={`${portal.portalName} Settings`}
+        description={`Manage theme and session preferences for the ${user.role} portal in Waste-IQ.`}
+        path={`${portal.homePath.replace("/overview", "")}/settings`}
       />
 
       <PageHeader
         title="Settings"
-        description="Theme and session preferences can be managed here, while unsupported backend settings remain clearly marked."
+        description={`Theme and session controls are active for the ${portal.portalName.toLowerCase()}, while unsupported account-management actions stay clearly informational.`}
       />
 
       <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
@@ -45,7 +52,7 @@ export function SettingsPage() {
               <Sun className="h-5 w-5 text-primary" />
               <p className="mt-4 font-medium">Light mode</p>
               <p className="mt-2 text-sm text-muted-foreground">
-                Bright surfaces with emerald and cyan highlights.
+                Bright surfaces with the established Waste-IQ accent palette.
               </p>
             </button>
             <button
@@ -58,7 +65,7 @@ export function SettingsPage() {
               <MoonStar className="h-5 w-5 text-primary" />
               <p className="mt-4 font-medium">Dark mode</p>
               <p className="mt-2 text-sm text-muted-foreground">
-                Dark surfaces with the same established portal contrast palette.
+                Dark surfaces that preserve the same portal contrast language.
               </p>
             </button>
           </div>
@@ -66,7 +73,7 @@ export function SettingsPage() {
 
         <DashboardCard
           title="Session"
-          description="Session behavior uses the existing authentication storage keys."
+          description="Session behavior uses the shared authentication storage flow."
         >
           <div className="space-y-4">
             <div className="rounded-2xl border bg-muted/20 p-4">
@@ -82,23 +89,24 @@ export function SettingsPage() {
 
         <DashboardCard
           title="Notifications"
-          description="Reusable UI is present, but there are no citizen notification endpoints in the backend."
+          description="Notification delivery remains backend-dependent for every authenticated role."
         >
           <div className="space-y-4">
             <NotificationCard
               title="Notifications not connected"
-              message="Unread counts, notification lists, and mark-as-read actions will be enabled once FastAPI notification endpoints exist."
+              message={`The ${portal.portalName.toLowerCase()} does not yet have dedicated notification endpoints wired into the frontend.`}
               timestamp="Backend endpoint unavailable"
             />
             <div className="rounded-2xl border bg-muted/20 p-4 text-sm text-muted-foreground">
-              The current Sprint 3 build intentionally avoids fake notifications or mock unread counts.
+              Route protection is now complete, and notification preferences can be layered into this
+              settings surface once role-specific delivery APIs are connected.
             </div>
           </div>
         </DashboardCard>
 
         <DashboardCard
           title="Security"
-          description="Only supported settings are interactive. Unsupported security actions stay informational."
+          description="Unsupported security actions remain informational until backed by real endpoints."
         >
           <div className="space-y-4">
             <div className="rounded-2xl border bg-muted/20 p-4">
@@ -107,7 +115,8 @@ export function SettingsPage() {
                 <div>
                   <p className="font-medium">Password management unavailable</p>
                   <p className="mt-2 text-sm text-muted-foreground">
-                    There is no citizen password update endpoint in the current FastAPI backend, so this settings page does not present a fake change-password form.
+                    There is no role-specific password update flow connected in the current frontend,
+                    so this portal intentionally avoids showing a fake security form.
                   </p>
                 </div>
               </div>
@@ -116,9 +125,10 @@ export function SettingsPage() {
               <div className="flex items-start gap-3">
                 <Bell className="mt-0.5 h-5 w-5 text-primary" />
                 <div>
-                  <p className="font-medium">Notification preferences unavailable</p>
+                  <p className="font-medium">Preference delivery pending integration</p>
                   <p className="mt-2 text-sm text-muted-foreground">
-                    Notification preference toggles will make sense once backend notification delivery exists.
+                    Notification preference toggles can be connected cleanly later without changing
+                    this role-specific settings layout.
                   </p>
                 </div>
               </div>
