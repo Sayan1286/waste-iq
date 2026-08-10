@@ -1,11 +1,14 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 from app.api.router import api_router
 from app.core.config import settings
+from app.core.dependencies import get_db
 from app.core.logging import setup_logging
 from app.core.middleware import RequestIDMiddleware
 from app.core.sentry_sdk import init_sentry
@@ -91,6 +94,26 @@ def healthcheck() -> dict[str, object]:
         "app": settings.app_name,
         "cors_origins": settings.cors_origins_list,
     }
+
+
+@app.get("/health/ready", tags=["health"], response_model=None)
+def readiness_check(
+    db: Session = Depends(get_db),
+) -> dict[str, object] | JSONResponse:
+    try:
+        db.execute(text("SELECT 1"))
+        return {
+            "status": "ready",
+            "app": settings.app_name,
+        }
+    except Exception:
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "not_ready",
+                "app": settings.app_name,
+            },
+        )
 
 
 @app.get("/debug/cors", tags=["health"])
