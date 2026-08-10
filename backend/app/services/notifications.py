@@ -1,24 +1,3 @@
-
-import logging
-
-logger = logging.getLogger(__name__)
-
-
-class NotificationDispatcher:
-    @staticmethod
-    def reservation_expired(lot_id: int) -> None:
-        logger.info(
-            "Reservation expired notification sent for lot %s",
-            lot_id,
-        )
-
-    @staticmethod
-    def notify_admins(message: str) -> None:
-        logger.warning(
-            "ADMIN ALERT: %s",
-            message,
-        )
-
 from typing import Any
 
 from fastapi import HTTPException, status
@@ -154,12 +133,7 @@ class NotificationService:
 
 
 class NotificationDispatcher:
-    """Event-triggered notification send helpers used by the domain services.
-
-    Each helper creates notifications inside the caller's active transaction so
-    they commit (or roll back) atomically with the domain change that produced
-    them. Senders never commit here — the domain service owns the commit.
-    """
+    """Event-triggered notification send helpers used by the domain services."""
 
     def __init__(self, service: NotificationService | None = None) -> None:
         self._service = service or NotificationService()
@@ -177,6 +151,7 @@ class NotificationDispatcher:
     ) -> None:
         if user_id is None:
             return
+
         self._service.create(
             db,
             user_id=user_id,
@@ -187,7 +162,27 @@ class NotificationDispatcher:
             metadata_json=metadata_json,
         )
 
-    # ─── Pickup lifecycle ────────────────────────────────────────────────────
+    def notify_admins(
+        self,
+        db,
+        message: str,
+        *,
+        title: str = "Admin Notification",
+        link: str | None = None,
+        metadata_json: dict[str, Any] | None = None,
+    ) -> None:
+        admins = db.execute(select(User).where(User.role == UserRole.admin)).scalars().all()
+
+        for admin in admins:
+            self._notify(
+                db,
+                user_id=admin.id,
+                type=NotificationType.system,
+                title=title,
+                message=message,
+                link=link,
+                metadata_json=metadata_json,
+            )
 
     def notify_pickup_created(self, db, pickup_request: PickupRequest) -> None:
         title, message, link, metadata = fmt.format_pickup_created(pickup_request)
@@ -415,9 +410,13 @@ class NotificationBroadcaster:
         self._service = service or NotificationService()
 
     def broadcast(
-        self, db, payload: NotificationBroadcastRequest, broadcast_type: NotificationType
+        self,
+        db,
+        payload: NotificationBroadcastRequest,
+        broadcast_type: NotificationType,
     ) -> NotificationBroadcastRead:
         recipient_roles = payload.recipient_roles or []
+
         for role in recipient_roles:
             if role not in self._VALID_ROLES:
                 raise HTTPException(
@@ -426,8 +425,10 @@ class NotificationBroadcaster:
                 )
 
         statement = select(User.id)
+
         if recipient_roles:
             statement = statement.where(User.role.in_([UserRole(role) for role in recipient_roles]))
+
         user_ids = list(db.execute(statement).scalars().all())
 
         for user_id in user_ids:
@@ -439,6 +440,7 @@ class NotificationBroadcaster:
                 message=payload.message,
                 link=payload.link,
             )
+
         db.commit()
 
         return NotificationBroadcastRead(
@@ -448,4 +450,3 @@ class NotificationBroadcaster:
             link=payload.link,
             recipients_count=len(user_ids),
         )
-

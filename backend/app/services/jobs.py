@@ -56,13 +56,13 @@ def reservation_sweep_job() -> None:
 
         for lot in expired_lots:
             previous_status = lot.status
+            dealer_id = lot.reserved_by_dealer_id
 
             # Release reservation
             lot.status = InventoryLotStatus.available
             lot.reserved_by_dealer_id = None
             lot.reserved_at = None
             lot.reservation_expires_at = None
-
             # Create audit event
             db.add(
                 InventoryLotEvent(
@@ -76,10 +76,21 @@ def reservation_sweep_job() -> None:
                 )
             )
 
-            # Notify
-            NotificationDispatcher.reservation_expired(lot.id)
+            # Notify dealer
+            if dealer_id is not None:
+                try:
+                    NotificationDispatcher().notify_reservation_expired(
+                        db,
+                        lot,
+                        dealer_id,
+                    )
+                except Exception:
+                    logger.exception(
+                        "Failed to notify dealer %s about expired reservation", dealer_id
+                    )
 
-        db.commit()
+            # persist changes for this lot
+            db.commit()
 
         # Update last successful run
         last_runs["reservation_sweep"] = datetime.now(timezone.utc)
@@ -120,10 +131,15 @@ def aging_pickup_alert_job() -> None:
 
         logger.info("Found %d aging pickup(s)", len(pickups))
 
+        dispatcher = NotificationDispatcher()
+
         for pickup in pickups:
-            NotificationDispatcher.notify_admins(
-                f"Pickup {pickup.id} has been pending for more than 2 days."
+            dispatcher.notify_admins(
+                db,
+                f"Pickup {pickup.id} has been pending for more than 2 days.",
+                title="Aging Pickup Alert",
             )
+        db.commit()
 
         # Update last successful run
         last_runs["aging_pickups"] = datetime.now(timezone.utc)
