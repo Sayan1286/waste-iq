@@ -12,13 +12,9 @@ router = APIRouter(
 def job_status():
     return {
         "reservation_sweep": (
-            last_runs["reservation_sweep"].isoformat()
-            if last_runs["reservation_sweep"]
-            else None
+            last_runs["reservation_sweep"].isoformat() if last_runs["reservation_sweep"] else None
         ),
         "aging_pickups": (
-            last_runs["aging_pickups"].isoformat()
-            if last_runs["aging_pickups"]
-            else None
+            last_runs["aging_pickups"].isoformat() if last_runs["aging_pickups"] else None
         ),
     }

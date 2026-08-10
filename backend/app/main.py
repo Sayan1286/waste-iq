@@ -93,7 +93,6 @@ def healthcheck() -> dict[str, object]:
     }
 
 
-
 @app.get("/debug/cors", tags=["health"])
 def debug_cors():
     return {
@@ -101,5 +100,3 @@ def debug_cors():
         "cors_origins_list": settings.cors_origins_list,
         "loaded_into_middleware": cors_origins,
     }
-
-

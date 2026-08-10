@@ -52,7 +52,7 @@ def validate_approval_transition(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
-                f"Invalid approval status transition from " f"'{current.value}' to '{target.value}'"
+                f"Invalid approval status transition from '{current.value}' to '{target.value}'"
             ),
         )
 
