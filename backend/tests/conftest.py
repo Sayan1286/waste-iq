@@ -57,6 +57,8 @@ def db_session():
         session.close()
         Base.metadata.drop_all(bind=engine)
         engine.dispose()
+
+
 @pytest.fixture()
 def jobs_session_factory(db_session):
     bind = db_session.get_bind()
@@ -67,6 +69,7 @@ def jobs_session_factory(db_session):
         autocommit=False,
         future=True,
     )
+
 
 @pytest.fixture()
 def client(db_session):

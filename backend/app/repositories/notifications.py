@@ -5,6 +5,7 @@ from app.models.notification import Notification, NotificationStatus, Notificati
 
 PAGE_SIZE_MAX = 50
 
+
 class NotificationRepository:
     def create(self, db: Session, notification: Notification) -> Notification:
         db.add(notification)
@@ -19,11 +20,15 @@ class NotificationRepository:
         metadata_key: str,
         metadata_value: str,
     ) -> bool:
-        notifications = db.execute(
-            select(Notification).where(
-                Notification.type == notification_type,
+        notifications = (
+            db.execute(
+                select(Notification).where(
+                    Notification.type == notification_type,
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
 
         return any(
             notification.metadata_json
@@ -37,9 +42,7 @@ class NotificationRepository:
         user_id: int,
         notification_id: int,
     ) -> Notification | None:
-        statement = self.base_query_for_user(user_id).where(
-            Notification.id == notification_id
-        )
+        statement = self.base_query_for_user(user_id).where(Notification.id == notification_id)
         return db.execute(statement).scalar_one_or_none()
 
     def base_query_for_user(

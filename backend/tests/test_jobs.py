@@ -10,7 +10,6 @@ from app.models.pickup_request import PickupRequest, PickupStatus
 from app.services import jobs
 
 
-
 def test_reservation_sweep_releases_expired_lot(
     db_session,
     inventory_lot,
@@ -18,29 +17,25 @@ def test_reservation_sweep_releases_expired_lot(
     jobs_session_factory,
     monkeypatch,
 ):
-
     inventory_lot.status = InventoryLotStatus.reserved
     inventory_lot.reserved_by_dealer_id = dealer_user.id
     inventory_lot.reserved_at = datetime.now(timezone.utc) - timedelta(hours=25)
-    inventory_lot.reservation_expires_at = (
-        datetime.now(timezone.utc) - timedelta(hours=1)
-    )
+    inventory_lot.reservation_expires_at = datetime.now(timezone.utc) - timedelta(hours=1)
     db_session.commit()
 
     monkeypatch.setattr(
-    jobs,
-    "SessionLocal",
-    jobs_session_factory,
-)
-
+        jobs,
+        "SessionLocal",
+        jobs_session_factory,
+    )
 
     jobs.reservation_sweep_job()
 
     lot = (
-    db_session.query(type(inventory_lot))
-    .filter(type(inventory_lot).id == inventory_lot.id)
-    .one()
-)
+        db_session.query(type(inventory_lot))
+        .filter(type(inventory_lot).id == inventory_lot.id)
+        .one()
+    )
 
     assert lot.status == InventoryLotStatus.available
     assert lot.reserved_by_dealer_id is None
@@ -51,8 +46,7 @@ def test_reservation_sweep_releases_expired_lot(
         db_session.query(InventoryLotEvent)
         .filter(
             InventoryLotEvent.inventory_lot_id == inventory_lot.id,
-            InventoryLotEvent.event_type
-            == InventoryLotEventType.reservation_expired,
+            InventoryLotEvent.event_type == InventoryLotEventType.reservation_expired,
         )
         .one()
     )
@@ -70,24 +64,22 @@ def test_reservation_sweep_ignores_unexpired_lot(
     inventory_lot.status = InventoryLotStatus.reserved
     inventory_lot.reserved_by_dealer_id = dealer_user.id
     inventory_lot.reserved_at = datetime.now(timezone.utc)
-    inventory_lot.reservation_expires_at = datetime.now(timezone.utc) + timedelta(
-        hours=1
-    )
+    inventory_lot.reservation_expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
     db_session.commit()
 
     monkeypatch.setattr(
-    jobs,
-    "SessionLocal",
-    jobs_session_factory,
-)
+        jobs,
+        "SessionLocal",
+        jobs_session_factory,
+    )
 
     jobs.reservation_sweep_job()
 
     lot = (
-    db_session.query(type(inventory_lot))
-    .filter(type(inventory_lot).id == inventory_lot.id)
-    .one()
-)
+        db_session.query(type(inventory_lot))
+        .filter(type(inventory_lot).id == inventory_lot.id)
+        .one()
+    )
 
     assert lot.status == InventoryLotStatus.reserved
     assert lot.reserved_by_dealer_id == dealer_user.id

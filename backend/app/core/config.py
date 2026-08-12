@@ -179,6 +179,7 @@ class Settings(BaseSettings):
     def monitoring_enabled(self) -> bool:
         return self.enable_metrics or self.sentry_enabled
 
+
 @lru_cache
 def get_settings() -> Settings:
     return Settings()

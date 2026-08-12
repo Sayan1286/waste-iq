@@ -116,9 +116,7 @@ def aging_pickup_alert_job() -> None:
     db = SessionLocal()
 
     try:
-        cutoff = datetime.now(timezone.utc) - timedelta(
-            days=settings.aging_pickup_threshold_days
-        )
+        cutoff = datetime.now(timezone.utc) - timedelta(days=settings.aging_pickup_threshold_days)
 
         pickups = (
             db.query(PickupRequest)
@@ -177,6 +175,7 @@ def aging_pickup_alert_job() -> None:
 
     finally:
         db.close()
+
 
 # --------------------------------------------------
 # Scheduler
