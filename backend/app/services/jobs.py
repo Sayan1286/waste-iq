@@ -17,7 +17,10 @@ from app.models.pickup_request import (
     PickupRequest,
     PickupStatus,
 )
+from app.models.notification import NotificationType
+from app.repositories.notifications import NotificationRepository
 from app.services.notifications import NotificationDispatcher
+
 
 logger = logging.getLogger(__name__)
 
@@ -113,7 +116,9 @@ def aging_pickup_alert_job() -> None:
     db = SessionLocal()
 
     try:
-        cutoff = datetime.now(timezone.utc) - timedelta(days=2)
+        cutoff = datetime.now(timezone.utc) - timedelta(
+            days=settings.aging_pickup_threshold_days
+        )
 
         pickups = (
             db.query(PickupRequest)
@@ -132,33 +137,54 @@ def aging_pickup_alert_job() -> None:
         logger.info("Found %d aging pickup(s)", len(pickups))
 
         dispatcher = NotificationDispatcher()
+        notification_repository = NotificationRepository()
 
         for pickup in pickups:
+            metadata = {
+                "event": "aging_pickup_alert",
+                "pickup_id": str(pickup.id),
+            }
+
+            # Prevent duplicate notification for the same pickup.
+            if notification_repository.exists_by_metadata(
+                db,
+                notification_type=NotificationType.system,
+                metadata_key="pickup_id",
+                metadata_value=str(pickup.id),
+            ):
+                logger.info(
+                    "Aging pickup notification already exists for pickup %s",
+                    pickup.id,
+                )
+                continue
+
             dispatcher.notify_admins(
                 db,
-                f"Pickup {pickup.id} has been pending for more than 2 days.",
+                f"Pickup {pickup.id} has been pending for more than "
+                f"{settings.aging_pickup_threshold_days} days.",
                 title="Aging Pickup Alert",
+                metadata_json=metadata,
             )
+
         db.commit()
 
-        # Update last successful run
         last_runs["aging_pickups"] = datetime.now(timezone.utc)
 
     except Exception:
+        db.rollback()
         logger.exception("Aging pickup check failed")
         raise
 
     finally:
         db.close()
 
-
 # --------------------------------------------------
 # Scheduler
 # --------------------------------------------------
 def start_scheduler() -> None:
     # Disable scheduler during tests
-    if settings.environment == "test":
-        logger.info("Scheduler disabled in test environment")
+    if settings.environment == "test" or not settings.enable_background_jobs:
+        logger.info("Background jobs disabled")
         return
 
     if scheduler.running:
@@ -168,7 +194,7 @@ def start_scheduler() -> None:
         scheduler.add_job(
             reservation_sweep_job,
             trigger="interval",
-            minutes=1,
+            minutes=settings.reservation_sweep_interval_minutes,
             id="reservation_sweep",
             replace_existing=True,
         )
@@ -177,7 +203,7 @@ def start_scheduler() -> None:
         scheduler.add_job(
             aging_pickup_alert_job,
             trigger="interval",
-            minutes=5,
+            minutes=settings.aging_pickup_interval_minutes,
             id="aging_pickups",
             replace_existing=True,
         )
