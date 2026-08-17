@@ -36,8 +36,10 @@ def get_current_user(
         )
 
     try:
-        user_id = int(decode_access_token(credentials.credentials))
-    except ValueError as exc:
+        payload = decode_access_token(credentials.credentials)
+        user_id = int(payload["sub"])
+        token_ver = payload.get("ver", 1)
+    except (ValueError, KeyError) as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=str(exc),
@@ -47,6 +49,14 @@ def get_current_user(
     user = db.get(User, user_id)
     if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+
+    if user.token_version != token_ver:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session expired or revoked",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     return user
 
 
@@ -87,3 +97,12 @@ def get_pickup_request_creation_service(
     image_service: PickupRequestImageService = Depends(get_pickup_request_image_service),
 ) -> PickupRequestCreationService:
     return PickupRequestCreationService(image_service=image_service)
+
+
+def rate_limit(requests: int, window: int):
+    """Stub for rate limiting dependency (WIQ-V1-017)"""
+
+    def dependency():
+        pass
+
+    return dependency

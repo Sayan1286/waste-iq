@@ -63,7 +63,7 @@ export function ThemeProvider({
   );
 }
 
-// eslint-disable-next-line react-refresh/only-export-components -- hooks must live with their provider to keep a single import path for consumers
+// eslint-disable-next-line react-refresh/only-export-components
 export const useTheme = () => {
   const context = useContext(ThemeContext);
 
