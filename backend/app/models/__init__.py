@@ -1,3 +1,4 @@
+from app.models.audit_log import AuditLog
 from app.models.collector_assignment import CollectorAssignment
 from app.models.collector_location import CollectorLocation, CollectorLocationHistory
 from app.models.dealer_inventory import DealerInventory, DealerInventoryStatus
@@ -20,6 +21,7 @@ from app.models.user import User, UserRole
 
 __all__ = [
     "User",
+    "AuditLog",
     "UserRole",
     "DealerProfile",
     "DealerApprovalStatus",

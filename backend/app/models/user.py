@@ -48,3 +48,8 @@ class User(Base):
         "DealerProfile", back_populates="user", cascade="all, delete-orphan", uselist=False
     )
     notifications = relationship("Notification", back_populates="user")
+    audit_logs = relationship(
+        "AuditLog",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )

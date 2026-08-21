@@ -1,3 +1,4 @@
+from app.models.audit_log import AuditLog
 from app.models.collector_assignment import CollectorAssignment
 from app.models.collector_location import CollectorLocation, CollectorLocationHistory
 from app.models.dealer_profile import DealerProfile
@@ -14,6 +15,7 @@ from app.models.user import User
 
 __all__ = [
     "User",
+    "AuditLog",
     "PickupRequest",
     "PickupRequestEvent",
     "CollectorAssignment",
