@@ -154,6 +154,12 @@ export function LoginPage() {
               Remember me
             </label>
           </div>
+          <Link
+            to="/forgot-password"
+            className="text-sm font-medium text-primary hover:underline focus:outline-none focus:ring-2 focus:ring-ring rounded"
+          >
+            Forgot password?
+          </Link>
         </div>
 
         <Button
