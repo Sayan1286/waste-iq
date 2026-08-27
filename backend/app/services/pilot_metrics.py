@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select  # type: ignore[import-not-found]
 from sqlalchemy.orm import Session
 
 from app.models.collector_assignment import CollectorAssignment
@@ -51,10 +51,15 @@ def get_pilot_operational_metrics(
     completion_times: list[float] = []
 
     for assignment in assignments:
+        request = assignment.pickup_request
+
+        if request is None:
+            continue
+
         if assignment.accepted_at is not None:
             assignment_times.append(
                 _minutes_between(
-                    assignment.created_at,
+                    request.created_at,
                     assignment.accepted_at,
                 )
             )
@@ -62,7 +67,7 @@ def get_pilot_operational_metrics(
         if assignment.completed_at is not None:
             completion_times.append(
                 _minutes_between(
-                    assignment.created_at,
+                    request.created_at,
                     assignment.completed_at,
                 )
             )

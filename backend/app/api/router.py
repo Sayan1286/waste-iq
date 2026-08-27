@@ -12,6 +12,7 @@ from app.api.routes import (
     marketplace,
     notifications,
     pickup_requests,
+    pilot_metrics,
 )
 
 api_router = APIRouter()
@@ -96,4 +97,10 @@ api_router.include_router(
     inventory.dealer_router,
     prefix="/dealer",
     tags=["Dealer Inventory"],
+)
+# Pilot Metrics
+api_router.include_router(
+    pilot_metrics.router,
+    prefix="/admin/pilot-metrics",
+    tags=["Pilot Metrics"],
 )
