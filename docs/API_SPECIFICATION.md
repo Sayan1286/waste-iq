@@ -847,9 +847,9 @@ and records a `draft` timeline event for re-review.
 | `404` | Profile does not exist yet |
 | `409` | GST or license number already registered to another dealer |
 
-<<<<<<< HEAD
-=======
----
+
+
+
 
 ### `POST /dealer/profile/submit`
 
@@ -898,8 +898,8 @@ Retrieve the approval timeline for the authenticated dealer's profile
 | `200` | Timeline returned |
 | `404` | Profile does not exist yet |
 
->>>>>>> origin/main
----
+
+
 
 ### `POST /dealer/profile/submit`
 
