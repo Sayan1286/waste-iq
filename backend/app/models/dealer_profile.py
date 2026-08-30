@@ -3,7 +3,18 @@ from __future__ import annotations
 import enum
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, JSON, String, Text, func, text
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Index,
+    JSON,
+    String,
+    Text,
+    func,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
@@ -19,9 +30,17 @@ class DealerApprovalStatus(str, enum.Enum):
 class DealerProfile(Base):
     __tablename__ = "dealer_profiles"
 
+    __table_args__ = (
+        Index("ix_dealer_profiles_gst_number", "gst_number", unique=True),
+        Index("ix_dealer_profiles_license_number", "license_number", unique=True),
+    )
+
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     user_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True, index=True
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+        index=True,
     )
     business_name: Mapped[str] = mapped_column(String(160), nullable=False)
     owner_name: Mapped[str] = mapped_column(String(120), nullable=False)
@@ -30,9 +49,19 @@ class DealerProfile(Base):
     address: Mapped[str] = mapped_column(Text, nullable=False)
     city: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     state: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    postal_code: Mapped[str] = mapped_column(String(12), nullable=False, index=True)
-    gst_number: Mapped[str | None] = mapped_column(String(30), nullable=True, unique=True)
-    license_number: Mapped[str | None] = mapped_column(String(50), nullable=True, unique=True)
+    postal_code: Mapped[str] = mapped_column(
+        String(12),
+        nullable=False,
+        index=True,
+    )
+    gst_number: Mapped[str | None] = mapped_column(
+        String(30),
+        nullable=True,
+    )
+    license_number: Mapped[str | None] = mapped_column(
+        String(50),
+        nullable=True,
+    )
     business_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
     profile_image: Mapped[str | None] = mapped_column(String(500), nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -46,11 +75,19 @@ class DealerProfile(Base):
     )
     rejection_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_verified: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, default=False, server_default=text("false")
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default=text("false"),
     )
-    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    approved_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
