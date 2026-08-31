@@ -338,3 +338,397 @@ def test_list_marketplace_inventory_search(
 
     assert body["total_items"] == 1
     assert body["items"][0]["material_description"] == "Aluminum cans"
+
+
+def test_approved_dealer_can_purchase_reserved_lot(
+    client: TestClient,
+    dealer_headers: dict,
+    approved_dealer_profile,
+    inventory_lot,
+):
+    reserve_response = client.post(
+        f"/marketplace/inventory/{inventory_lot.id}/reserve",
+        headers=dealer_headers,
+    )
+
+    assert reserve_response.status_code == 200
+
+    response = client.post(
+        f"/marketplace/inventory/{inventory_lot.id}/purchase",
+        headers=dealer_headers,
+    )
+
+    assert response.status_code == 201
+
+    body = response.json()
+
+    assert body["inventory_lot_id"] == inventory_lot.id
+    assert body["dealer_id"] == approved_dealer_profile.user_id
+
+
+def test_dealer_cannot_purchase_unreserved_lot(
+    client: TestClient,
+    dealer_headers: dict,
+    approved_dealer_profile,
+    inventory_lot,
+):
+    response = client.post(
+        f"/marketplace/inventory/{inventory_lot.id}/purchase",
+        headers=dealer_headers,
+    )
+
+    assert response.status_code == 400
+
+
+def test_dealer_cannot_purchase_sold_lot(
+    client: TestClient,
+    db_session: Session,
+    dealer_headers: dict,
+    approved_dealer_profile,
+    inventory_lot,
+):
+    from app.models.inventory_lot import InventoryLotStatus
+
+    inventory_lot.status = InventoryLotStatus.sold
+    db_session.commit()
+
+    response = client.post(
+        f"/marketplace/inventory/{inventory_lot.id}/purchase",
+        headers=dealer_headers,
+    )
+
+    assert response.status_code == 409
+
+
+def test_dealer_cannot_purchase_lot_reserved_by_another_dealer(
+    client: TestClient,
+    db_session: Session,
+    dealer_headers: dict,
+    approved_dealer_profile,
+    inventory_lot,
+):
+    from app.models.inventory_lot import InventoryLotStatus
+
+    inventory_lot.status = InventoryLotStatus.reserved
+    inventory_lot.reserved_by_dealer_id = 999999
+    db_session.commit()
+
+    response = client.post(
+        f"/marketplace/inventory/{inventory_lot.id}/purchase",
+        headers=dealer_headers,
+    )
+
+    assert response.status_code == 409
+
+
+def test_purchase_changes_lot_to_sold(
+    client: TestClient,
+    db_session: Session,
+    dealer_headers: dict,
+    approved_dealer_profile,
+    inventory_lot,
+):
+    from app.models.inventory_lot import InventoryLotStatus
+
+    reserve_response = client.post(
+        f"/marketplace/inventory/{inventory_lot.id}/reserve",
+        headers=dealer_headers,
+    )
+
+    assert reserve_response.status_code == 200
+
+    purchase_response = client.post(
+        f"/marketplace/inventory/{inventory_lot.id}/purchase",
+        headers=dealer_headers,
+    )
+
+    assert purchase_response.status_code == 201
+
+    db_session.refresh(inventory_lot)
+
+    assert inventory_lot.status == InventoryLotStatus.sold
+    assert inventory_lot.reserved_by_dealer_id is None
+    assert inventory_lot.reservation_expires_at is None
+
+
+def test_approved_dealer_can_reserve_available_lot(
+    client: TestClient,
+    dealer_headers: dict,
+    approved_dealer_profile,
+    inventory_lot,
+):
+    response = client.post(
+        f"/marketplace/inventory/{inventory_lot.id}/reserve",
+        headers=dealer_headers,
+    )
+
+    assert response.status_code == 200
+
+    body = response.json()
+    assert body["id"] == inventory_lot.id
+    assert body["status"] == "reserved"
+
+
+def test_dealer_cannot_reserve_already_reserved_lot(
+    client: TestClient,
+    db_session: Session,
+    dealer_headers: dict,
+    approved_dealer_profile,
+    inventory_lot,
+):
+    from app.models.inventory_lot import InventoryLotStatus
+
+    inventory_lot.status = InventoryLotStatus.reserved
+    db_session.commit()
+
+    response = client.post(
+        f"/marketplace/inventory/{inventory_lot.id}/reserve",
+        headers=dealer_headers,
+    )
+
+    assert response.status_code == 409
+    assert "already reserved" in response.json()["detail"].lower()
+
+
+def test_dealer_cannot_reserve_sold_lot(
+    client: TestClient,
+    db_session: Session,
+    dealer_headers: dict,
+    approved_dealer_profile,
+    inventory_lot,
+):
+    from app.models.inventory_lot import InventoryLotStatus
+
+    inventory_lot.status = InventoryLotStatus.sold
+    db_session.commit()
+
+    response = client.post(
+        f"/marketplace/inventory/{inventory_lot.id}/reserve",
+        headers=dealer_headers,
+    )
+
+    assert response.status_code == 409
+    assert "sold" in response.json()["detail"].lower()
+
+
+def test_dealer_cannot_reserve_hidden_lot(
+    client: TestClient,
+    db_session: Session,
+    dealer_headers: dict,
+    approved_dealer_profile,
+    inventory_lot,
+):
+    from app.models.inventory_lot import InventoryLotVisibility
+
+    inventory_lot.visibility = InventoryLotVisibility.hidden
+    db_session.commit()
+
+    response = client.post(
+        f"/marketplace/inventory/{inventory_lot.id}/reserve",
+        headers=dealer_headers,
+    )
+
+    assert response.status_code == 404
+
+
+def test_dealer_cannot_reserve_archived_lot(
+    client: TestClient,
+    db_session: Session,
+    dealer_headers: dict,
+    approved_dealer_profile,
+    inventory_lot,
+):
+    from datetime import datetime, timezone
+
+    inventory_lot.archived_at = datetime.now(timezone.utc)
+    db_session.commit()
+
+    response = client.post(
+        f"/marketplace/inventory/{inventory_lot.id}/reserve",
+        headers=dealer_headers,
+    )
+
+    assert response.status_code == 404
+
+
+def test_reservation_sets_expiry_time(
+    client: TestClient,
+    db_session: Session,
+    dealer_headers: dict,
+    approved_dealer_profile,
+    inventory_lot,
+):
+    response = client.post(
+        f"/marketplace/inventory/{inventory_lot.id}/reserve",
+        headers=dealer_headers,
+    )
+
+    assert response.status_code == 200
+
+    db_session.refresh(inventory_lot)
+
+    assert inventory_lot.reserved_at is not None
+    assert inventory_lot.reservation_expires_at is not None
+    assert inventory_lot.reservation_expires_at > inventory_lot.reserved_at
+
+
+def test_reservation_records_dealer(
+    client: TestClient,
+    db_session: Session,
+    dealer_user,
+    dealer_headers: dict,
+    approved_dealer_profile,
+    inventory_lot,
+):
+    response = client.post(
+        f"/marketplace/inventory/{inventory_lot.id}/reserve",
+        headers=dealer_headers,
+    )
+
+    assert response.status_code == 200
+
+    db_session.refresh(inventory_lot)
+
+    assert inventory_lot.reserved_by_dealer_id == dealer_user.id
+
+
+def test_dealer_can_cancel_own_reservation(
+    client: TestClient,
+    dealer_headers: dict,
+    approved_dealer_profile,
+    inventory_lot,
+):
+    response = client.post(
+        f"/marketplace/inventory/{inventory_lot.id}/reserve",
+        headers=dealer_headers,
+    )
+
+    assert response.status_code == 200
+
+    response = client.post(
+        f"/marketplace/inventory/{inventory_lot.id}/cancel-reservation",
+        headers=dealer_headers,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "available"
+
+
+def test_dealer_cannot_cancel_unreserved_lot(
+    client: TestClient,
+    dealer_headers: dict,
+    approved_dealer_profile,
+    inventory_lot,
+):
+    response = client.post(
+        f"/marketplace/inventory/{inventory_lot.id}/cancel-reservation",
+        headers=dealer_headers,
+    )
+
+    assert response.status_code in {400, 409}
+
+
+def test_dealer_cannot_cancel_another_dealers_reservation(
+    client: TestClient,
+    db_session: Session,
+    dealer_user,
+    dealer_headers: dict,
+    approved_dealer_profile,
+    inventory_lot,
+):
+    from app.models.inventory_lot import InventoryLotStatus
+
+    inventory_lot.status = InventoryLotStatus.reserved
+    inventory_lot.reserved_by_dealer_id = dealer_user.id + 999
+    db_session.commit()
+
+    response = client.post(
+        f"/marketplace/inventory/{inventory_lot.id}/cancel-reservation",
+        headers=dealer_headers,
+    )
+
+    assert response.status_code in {403, 404, 409}
+
+
+def test_reserved_lot_is_not_visible_as_available(
+    client: TestClient,
+    dealer_headers: dict,
+    approved_dealer_profile,
+    inventory_lot,
+):
+    response = client.post(
+        f"/marketplace/inventory/{inventory_lot.id}/reserve",
+        headers=dealer_headers,
+    )
+
+    assert response.status_code == 200
+
+    response = client.get(
+        "/marketplace/inventory",
+        headers=dealer_headers,
+    )
+
+    assert response.status_code == 200
+
+    items = response.json()["items"]
+
+    assert all(item["status"] != "available" for item in items)
+
+
+def test_reservation_response_contains_expiry(
+    client: TestClient,
+    dealer_headers: dict,
+    approved_dealer_profile,
+    inventory_lot,
+):
+    response = client.post(
+        f"/marketplace/inventory/{inventory_lot.id}/reserve",
+        headers=dealer_headers,
+    )
+
+    assert response.status_code == 200
+
+    body = response.json()
+
+    assert body["reservation_expires_at"] is not None
+
+
+def test_reservation_response_contains_reserved_dealer(
+    client: TestClient,
+    db_session: Session,
+    dealer_user,
+    dealer_headers: dict,
+    approved_dealer_profile,
+    inventory_lot,
+):
+    response = client.post(
+        f"/marketplace/inventory/{inventory_lot.id}/reserve",
+        headers=dealer_headers,
+    )
+
+    assert response.status_code == 200
+
+    db_session.refresh(inventory_lot)
+
+    assert inventory_lot.reserved_by_dealer_id == dealer_user.id
+
+
+def test_reservation_changes_lot_status(
+    client: TestClient,
+    db_session: Session,
+    dealer_headers: dict,
+    approved_dealer_profile,
+    inventory_lot,
+):
+    from app.models.inventory_lot import InventoryLotStatus
+
+    response = client.post(
+        f"/marketplace/inventory/{inventory_lot.id}/reserve",
+        headers=dealer_headers,
+    )
+
+    assert response.status_code == 200
+
+    db_session.refresh(inventory_lot)
+
+    assert inventory_lot.status == InventoryLotStatus.reserved

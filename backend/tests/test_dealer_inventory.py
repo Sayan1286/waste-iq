@@ -197,3 +197,128 @@ def test_unapproved_dealer_cannot_access_inventory_detail(
 ):
     res = client.get("/dealer/inventory/1", headers=dealer_headers)
     assert res.status_code == 403
+
+
+def test_unauthenticated_cannot_access_dealer_inventory(client):
+    response = client.get("/dealer/inventory")
+    assert response.status_code == 401
+
+
+def test_citizen_cannot_access_dealer_inventory(client, citizen_headers):
+    response = client.get("/dealer/inventory", headers=citizen_headers)
+    assert response.status_code == 403
+
+
+def test_citizen_cannot_create_dealer_inventory(client, citizen_headers):
+    payload = {
+        "pickup_request_id": 1,
+        "material_type": "Plastic",
+        "category": "Plastic",
+        "quantity_kg": 5.0,
+        "price_per_kg": 2.0,
+    }
+
+    response = client.post(
+        "/dealer/inventory",
+        headers=citizen_headers,
+        json=payload,
+    )
+    assert response.status_code == 403
+
+
+def test_dealer_cannot_create_inventory_from_pending_pickup(
+    client: TestClient,
+    db_session: Session,
+    dealer_headers: dict,
+    approved_dealer_profile,
+):
+    pickup = PickupRequest(
+        user_id=1,
+        waste_type="Plastic",
+        status=PickupStatus.pending,
+        latitude=0.0,
+        longitude=0.0,
+        address="123 Test St",
+    )
+    db_session.add(pickup)
+    db_session.commit()
+
+    response = client.post(
+        "/dealer/inventory",
+        headers=dealer_headers,
+        json={
+            "pickup_request_id": pickup.id,
+            "material_type": "Plastic",
+            "category": "Plastic",
+            "quantity_kg": 5.0,
+            "price_per_kg": 2.0,
+        },
+    )
+
+    assert response.status_code == 400
+
+
+def test_dealer_cannot_update_nonexistent_inventory(
+    client: TestClient,
+    dealer_headers: dict,
+    approved_dealer_profile,
+):
+    response = client.put(
+        "/dealer/inventory/999999",
+        headers=dealer_headers,
+        json={"price_per_kg": 3.0},
+    )
+
+    assert response.status_code == 404
+
+
+def test_dealer_cannot_delete_nonexistent_inventory(
+    client: TestClient,
+    dealer_headers: dict,
+    approved_dealer_profile,
+):
+    response = client.delete(
+        "/dealer/inventory/999999",
+        headers=dealer_headers,
+    )
+
+    assert response.status_code == 404
+
+
+def test_dealer_cannot_reserve_nonexistent_inventory(
+    client: TestClient,
+    dealer_headers: dict,
+    approved_dealer_profile,
+):
+    response = client.post(
+        "/dealer/inventory/999999/reserve",
+        headers=dealer_headers,
+    )
+
+    assert response.status_code == 404
+
+
+def test_dealer_cannot_release_nonexistent_inventory(
+    client: TestClient,
+    dealer_headers: dict,
+    approved_dealer_profile,
+):
+    response = client.post(
+        "/dealer/inventory/999999/release",
+        headers=dealer_headers,
+    )
+
+    assert response.status_code == 404
+
+
+def test_dealer_cannot_mark_nonexistent_inventory_sold(
+    client: TestClient,
+    dealer_headers: dict,
+    approved_dealer_profile,
+):
+    response = client.post(
+        "/dealer/inventory/999999/mark-sold",
+        headers=dealer_headers,
+    )
+
+    assert response.status_code == 404

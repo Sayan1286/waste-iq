@@ -374,3 +374,94 @@ def test_reserve_sets_audit_event(
     events = response.json()
     event_types = [e["event_type"] for e in events]
     assert "reserved" in event_types
+
+
+def test_unauthenticated_cannot_access_dealer_profile(client):
+    response = client.get("/dealer/profile")
+    assert response.status_code == 401
+
+
+def test_unauthenticated_cannot_access_dealer_inventory_lots(client):
+    response = client.get("/dealer/inventory-lots")
+    assert response.status_code == 401
+
+
+def test_unauthenticated_cannot_reserve_inventory_lot(client, inventory_lot):
+    response = client.post(f"/dealer/inventory-lots/{inventory_lot.id}/reserve")
+    assert response.status_code == 401
+
+
+def test_citizen_cannot_view_dealer_lot_detail(client, citizen_headers, inventory_lot):
+    response = client.get(
+        f"/dealer/inventory-lots/{inventory_lot.id}",
+        headers=citizen_headers,
+    )
+    assert response.status_code == 403
+
+
+def test_citizen_cannot_reserve_dealer_lot(client, citizen_headers, inventory_lot):
+    response = client.post(
+        f"/dealer/inventory-lots/{inventory_lot.id}/reserve",
+        headers=citizen_headers,
+    )
+    assert response.status_code == 403
+
+
+def test_pending_dealer_cannot_view_lot_detail(
+    client, dealer_headers, submitted_dealer_profile, inventory_lot
+):
+    response = client.get(
+        f"/dealer/inventory-lots/{inventory_lot.id}",
+        headers=dealer_headers,
+    )
+    assert response.status_code == 403
+
+
+def test_pending_dealer_cannot_access_inventory_listing(
+    client, dealer_headers, submitted_dealer_profile
+):
+    response = client.get(
+        "/dealer/inventory-lots",
+        headers=dealer_headers,
+    )
+    assert response.status_code == 403
+
+
+def test_reserve_nonexistent_lot_returns_404(client, dealer_headers, approved_dealer_profile):
+    response = client.post(
+        "/dealer/inventory-lots/999999/reserve",
+        headers=dealer_headers,
+    )
+    assert response.status_code == 404
+
+
+def test_lot_detail_after_reservation_is_hidden(
+    client, dealer_headers, approved_dealer_profile, inventory_lot
+):
+    reserve_response = client.post(
+        f"/dealer/inventory-lots/{inventory_lot.id}/reserve",
+        headers=dealer_headers,
+    )
+    assert reserve_response.status_code == 200
+
+    response = client.get(
+        f"/dealer/inventory-lots/{inventory_lot.id}",
+        headers=dealer_headers,
+    )
+    assert response.status_code == 404
+
+
+def test_cannot_reserve_same_lot_twice(
+    client, dealer_headers, approved_dealer_profile, inventory_lot
+):
+    first = client.post(
+        f"/dealer/inventory-lots/{inventory_lot.id}/reserve",
+        headers=dealer_headers,
+    )
+    assert first.status_code == 200
+
+    second = client.post(
+        f"/dealer/inventory-lots/{inventory_lot.id}/reserve",
+        headers=dealer_headers,
+    )
+    assert second.status_code == 409

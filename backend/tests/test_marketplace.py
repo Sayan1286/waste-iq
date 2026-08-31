@@ -862,3 +862,228 @@ def test_expired_reservation_records_expired_transaction(
     assert body["total_items"] == 1
     assert body["items"][0]["transaction_type"] == "reservation_expired"
     assert body["items"][0]["status"] == "expired"
+
+
+def test_marketplace_inventory_invalid_page_returns_400(
+    client: TestClient,
+    dealer_headers: dict,
+    approved_dealer_profile,
+):
+    response = client.get(
+        "/marketplace/inventory?page=0",
+        headers=dealer_headers,
+    )
+
+    assert response.status_code == 400
+
+
+def test_marketplace_inventory_negative_page_size_returns_400(
+    client: TestClient,
+    dealer_headers: dict,
+    approved_dealer_profile,
+):
+    response = client.get(
+        "/marketplace/inventory?page_size=0",
+        headers=dealer_headers,
+    )
+
+    assert response.status_code == 400
+
+
+def test_marketplace_inventory_invalid_sort_order_returns_400(
+    client: TestClient,
+    dealer_headers: dict,
+    approved_dealer_profile,
+    inventory_lot,
+):
+    response = client.get(
+        "/marketplace/inventory?sort_order=invalid",
+        headers=dealer_headers,
+    )
+
+    assert response.status_code == 400
+
+
+def test_marketplace_inventory_empty_search_returns_available_lot(
+    client: TestClient,
+    dealer_headers: dict,
+    approved_dealer_profile,
+    inventory_lot,
+):
+    response = client.get(
+        "/marketplace/inventory?search=",
+        headers=dealer_headers,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["total_items"] == 1
+
+
+def test_marketplace_inventory_nonexistent_category_returns_empty(
+    client: TestClient,
+    dealer_headers: dict,
+    approved_dealer_profile,
+    inventory_lot,
+):
+    response = client.get(
+        "/marketplace/inventory?material_category_id=999999",
+        headers=dealer_headers,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["total_items"] == 0
+
+
+def test_marketplace_inventory_nonexistent_city_returns_empty(
+    client: TestClient,
+    dealer_headers: dict,
+    approved_dealer_profile,
+    inventory_lot,
+):
+    response = client.get(
+        "/marketplace/inventory?city=NonexistentCity",
+        headers=dealer_headers,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["total_items"] == 0
+
+
+def test_marketplace_inventory_nonexistent_search_returns_empty(
+    client: TestClient,
+    dealer_headers: dict,
+    approved_dealer_profile,
+    inventory_lot,
+):
+    response = client.get(
+        "/marketplace/inventory?search=DefinitelyNotExistingMaterial",
+        headers=dealer_headers,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["total_items"] == 0
+
+
+def test_get_sold_marketplace_inventory_detail_returns_404(
+    client: TestClient,
+    db_session: Session,
+    dealer_headers: dict,
+    approved_dealer_profile,
+    inventory_lot,
+):
+    from app.models.inventory_lot import InventoryLotStatus
+
+    inventory_lot.status = InventoryLotStatus.sold
+    db_session.commit()
+
+    response = client.get(
+        f"/marketplace/inventory/{inventory_lot.id}",
+        headers=dealer_headers,
+    )
+
+    assert response.status_code == 404
+
+
+def test_get_hidden_marketplace_inventory_detail_returns_404(
+    client: TestClient,
+    db_session: Session,
+    dealer_headers: dict,
+    approved_dealer_profile,
+    inventory_lot,
+):
+    from app.models.inventory_lot import InventoryLotVisibility
+
+    inventory_lot.visibility = InventoryLotVisibility.hidden
+    db_session.commit()
+
+    response = client.get(
+        f"/marketplace/inventory/{inventory_lot.id}",
+        headers=dealer_headers,
+    )
+
+    assert response.status_code == 404
+
+
+def test_cancel_reservation_after_purchase_returns_conflict(
+    client: TestClient,
+    dealer_headers: dict,
+    approved_dealer_profile,
+    inventory_lot,
+):
+    client.post(
+        f"/marketplace/inventory/{inventory_lot.id}/reserve",
+        headers=dealer_headers,
+    )
+
+    purchased = client.post(
+        f"/marketplace/inventory/{inventory_lot.id}/purchase",
+        headers=dealer_headers,
+    )
+
+    assert purchased.status_code == 201
+
+    response = client.post(
+        f"/marketplace/inventory/{inventory_lot.id}/cancel-reservation",
+        headers=dealer_headers,
+    )
+
+    assert response.status_code in (400, 404, 409)
+
+
+def test_purchase_sold_lot_returns_conflict(
+    client: TestClient,
+    db_session: Session,
+    dealer_headers: dict,
+    approved_dealer_profile,
+    inventory_lot,
+):
+    from app.models.inventory_lot import InventoryLotStatus
+
+    inventory_lot.status = InventoryLotStatus.sold
+    db_session.commit()
+
+    response = client.post(
+        f"/marketplace/inventory/{inventory_lot.id}/purchase",
+        headers=dealer_headers,
+    )
+
+    assert response.status_code == 409
+
+
+def test_purchase_nonexistent_lot_returns_404(
+    client: TestClient,
+    dealer_headers: dict,
+    approved_dealer_profile,
+):
+    response = client.post(
+        "/marketplace/inventory/999999/purchase",
+        headers=dealer_headers,
+    )
+
+    assert response.status_code == 404
+
+
+def test_reserve_nonexistent_lot_returns_404(
+    client: TestClient,
+    dealer_headers: dict,
+    approved_dealer_profile,
+):
+    response = client.post(
+        "/marketplace/inventory/999999/reserve",
+        headers=dealer_headers,
+    )
+
+    assert response.status_code == 404
+
+
+def test_cancel_nonexistent_reservation_returns_404(
+    client: TestClient,
+    dealer_headers: dict,
+    approved_dealer_profile,
+):
+    response = client.post(
+        "/marketplace/inventory/999999/cancel-reservation",
+        headers=dealer_headers,
+    )
+
+    assert response.status_code == 404
