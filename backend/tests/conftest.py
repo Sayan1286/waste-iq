@@ -22,11 +22,18 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.core.dependencies import get_db
+from app.core.dependencies import get_db, reset_rate_limit_store
 from app.core.security import create_access_token, hash_password
 from app.main import app as fastapi_app
 from app.models.base import Base
 from app.models.user import User, UserRole
+
+
+@pytest.fixture(autouse=True)
+def reset_rate_limits():
+    reset_rate_limit_store()
+    yield
+    reset_rate_limit_store()
 
 
 @pytest.fixture()

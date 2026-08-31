@@ -1,6 +1,9 @@
+from collections import defaultdict
 from collections.abc import Generator
+from threading import Lock
+import time
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
@@ -99,10 +102,40 @@ def get_pickup_request_creation_service(
     return PickupRequestCreationService(image_service=image_service)
 
 
-def rate_limit(requests: int, window: int):
-    """Stub for rate limiting dependency (WIQ-V1-017)"""
+_rate_limit_store: dict[str, list[float]] = defaultdict(list)
+_rate_limit_lock = Lock()
 
-    def dependency():
-        pass
+
+def reset_rate_limit_store() -> None:
+    with _rate_limit_lock:
+        _rate_limit_store.clear()
+
+
+def rate_limit(requests: int, window: int):
+    """Limit requests from each client within a rolling time window."""
+
+    if requests <= 0:
+        raise ValueError("requests must be greater than 0")
+    if window <= 0:
+        raise ValueError("window must be greater than 0")
+
+    def dependency(request: Request) -> None:
+        client_id = request.client.host if request.client else "unknown"
+        now = time.monotonic()
+        cutoff = now - window
+
+        with _rate_limit_lock:
+            timestamps = _rate_limit_store[client_id]
+            timestamps[:] = [timestamp for timestamp in timestamps if timestamp > cutoff]
+
+            if len(timestamps) >= requests:
+                retry_after = max(1, int(window - (now - timestamps[0])))
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail="Too many requests. Please try again later.",
+                    headers={"Retry-After": str(retry_after)},
+                )
+
+            timestamps.append(now)
 
     return dependency

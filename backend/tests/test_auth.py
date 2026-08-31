@@ -211,3 +211,32 @@ def test_reset_password_success(client, db_session):
         json={"token": token, "new_password": "AnotherPassword@123"},
     )
     assert second_reset.status_code == 400
+
+
+def test_forgot_password_rate_limit(client):
+    payload = {"email": "rate-limit@example.com"}
+
+    for _ in range(5):
+        response = client.post("/auth/forgot-password", json=payload)
+        assert response.status_code == 200
+
+    response = client.post("/auth/forgot-password", json=payload)
+
+    assert response.status_code == 429
+    assert "Retry-After" in response.headers
+
+
+def test_reset_password_rate_limit(client):
+    payload = {
+        "token": "invalid-token",
+        "new_password": "NewPassword@123",
+    }
+
+    for _ in range(5):
+        response = client.post("/auth/reset-password", json=payload)
+        assert response.status_code == 400
+
+    response = client.post("/auth/reset-password", json=payload)
+
+    assert response.status_code == 429
+    assert "Retry-After" in response.headers
